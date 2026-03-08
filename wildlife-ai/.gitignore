@@ -1,0 +1,61 @@
+# ============================================================
+# Wildlife AI — .gitignore
+# ============================================================
+
+# ── SECRETS — NEVER COMMIT ─────────────────────────────────
+.env
+*.env
+serviceAccountKey.json
+*serviceAccount*.json
+
+# ── Large AI model files ────────────────────────────────────
+*.pth
+*.pt
+*.pkl
+*.h5
+*.onnx
+runs/             # YOLOv8 output
+
+# ── Dataset folders (too large for Git) ────────────────────
+data/train/
+data/val/
+data/uploads/
+data/raw/
+
+# ── Python ──────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyc
+.pytest_cache/
+*.egg-info/
+dist/
+venv/
+env/
+wildlife_env/
+.venv/
+
+# ── Node.js ──────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+
+# ── React / Vite build output ────────────────────────────────
+frontend/dist/
+frontend/.vite/
+
+# ── OS ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── IDE ──────────────────────────────────────────────────────
+.vscode/settings.json
+.idea/
+*.swp
+
+# ── Jupyter ──────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Logs ─────────────────────────────────────────────────────
+*.log
+logs/

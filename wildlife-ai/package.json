@@ -1,0 +1,14 @@
+{
+  "name": "wildlife-ai",
+  "version": "1.0.0",
+  "description": "Generative AI for Wildlife Conservation and Species Identification",
+  "scripts": {
+    "node-service": "node node-service/server.js",
+    "node-dev":     "nodemon node-service/server.js",
+    "frontend":     "cd frontend && npm run dev",
+    "install-all":  "cd node-service && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.3"
+  }
+}

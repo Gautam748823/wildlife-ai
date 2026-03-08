@@ -1,0 +1,35 @@
+/* =====================================================
+   Wildlife AI — Global CSS Reset & Base Styles
+   Most component styles are inline (CSS-in-JS) in .jsx files.
+   This file handles: reset, fonts, body base, scrollbar.
+   ===================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: #f0f4ec;
+  color: #1a2e1a;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: #4caf50;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar       { width: 8px; }
+::-webkit-scrollbar-track { background: #f1f8e9; }
+::-webkit-scrollbar-thumb { background: #a5d6a7; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #4caf50; }
+
+/* Utility */
+.hidden { display: none !important; }
