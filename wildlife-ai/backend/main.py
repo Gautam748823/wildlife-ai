@@ -1,123 +1,131 @@
-"""
-Wildlife AI — FastAPI Backend Entry Point
-==========================================
-Handles:
-  - Image upload + Cloudinary storage
-  - AI species prediction (classifier + detector)
-  - Generative AI report creation
-  - Delegates database writes to Node.js Firestore service
+"""FastAPI backend entrypoint for Wildlife AI prediction APIs."""
 
-Run locally:
-    uvicorn backend.main:app --reload --port 8000
-
-API docs:
-    http://localhost:8000/docs
-"""
+from __future__ import annotations
 
 import os
-import httpx
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from functools import lru_cache
+from pathlib import Path
+
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+
+from backend.api.routes import router as api_router
+from backend.models.classifier import SpeciesClassifier
+from backend.services.cloudinary_service import CloudinaryUploadError, upload_image
+from backend.services.firestore_service import FirestoreSaveError, save_sighting
+from backend.utils.preprocess import validate_image_bytes, validate_image_metadata
 
 load_dotenv()
 
 NODE_SERVICE_URL = os.getenv("NODE_SERVICE_URL", "http://localhost:5001")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# ── App ─────────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Wildlife AI API",
-    description="AI-powered wildlife species identification — Cloudinary + Firestore",
-    version="1.0.0",
+    description="Production-ready species identification backend",
+    version="2.0.0",
 )
+
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*")
+allow_origins = [x.strip() for x in allowed_origins.split(",")] if allowed_origins else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],        # In production: set to your React app URL
+    allow_origins=allow_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# ── Routes ───────────────────────────────────────────────────────────────────
+def _resolve_path_from_env(env_key: str, fallback: str) -> str:
+    raw = os.getenv(env_key, fallback)
+    path = Path(raw)
+    if not path.is_absolute():
+        path = PROJECT_ROOT / raw
+    return str(path)
+
+
+@lru_cache(maxsize=1)
+def get_classifier() -> SpeciesClassifier:
+    model_path = _resolve_path_from_env("MODEL_PATH", "best_model.pth")
+    class_names_path = _resolve_path_from_env("CLASS_NAMES_PATH", "class_names.json")
+    return SpeciesClassifier(model_path=model_path, class_names_path=class_names_path, architecture="resnet50")
+
+
+def _build_predict_response(predictions: list[dict], image_url: str) -> dict:
+    top = predictions[0] if predictions else {"species": "Unknown", "confidence": 0.0}
+    return {
+        "top_species": top["species"],
+        "confidence": top["confidence"],
+        "image_url": image_url,
+        "predictions": predictions,
+    }
+
+
 @app.get("/")
 def root():
-    return {"message": "Wildlife AI API running!", "docs": "/docs"}
+    return {"message": "Wildlife AI API running", "docs": "/docs"}
 
 
 @app.get("/health")
-def health():
-    return {"status": "ok", "node_service": NODE_SERVICE_URL}
+def health() -> dict:
+    return {
+        "status": "ok",
+        "service": "wildlife-ai-backend",
+        "node_service": NODE_SERVICE_URL,
+    }
+
+
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)) -> dict:
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Image file is required")
+
+    try:
+        validate_image_metadata(file.filename, file.content_type or "")
+        image_bytes = await file.read()
+        validate_image_bytes(image_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        image_url = upload_image(image_bytes, file.filename)
+    except CloudinaryUploadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    try:
+        classifier = get_classifier()
+        predictions = classifier.predict_bytes(image_bytes, top_k=5)
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=500, detail=f"Model inference failed: {exc}") from exc
+
+    response = _build_predict_response(predictions, image_url)
+
+    try:
+        await save_sighting(
+            image_url=image_url,
+            top_species=response["top_species"],
+            confidence=float(response["confidence"]),
+            predictions=response["predictions"],
+        )
+    except FirestoreSaveError as exc:
+        # Preserve successful prediction while reporting persistence issue.
+        response["storage_warning"] = str(exc)
+
+    return response
 
 
 @app.post("/api/predict")
-async def predict_species(file: UploadFile = File(...), location: str = "Unknown"):
-    """
-    Full pipeline:
-      1. Upload image to Cloudinary
-      2. Run AI species prediction
-      3. Generate wildlife report via Generative AI
-      4. Save sighting to Firestore via Node.js service
-      5. Return results to React frontend
-    """
-    # ── Step 1: Upload to Cloudinary ─────────────────────────────────────
-    from backend.utils.cloudinary_upload import upload_image_to_cloudinary
-    image_bytes = await file.read()
-    cloudinary_result = upload_image_to_cloudinary(image_bytes, file.filename)
-    image_url = cloudinary_result.get("secure_url", "")
-
-    # ── Step 2: Run AI Classification ────────────────────────────────────
-    from backend.models.classifier import SpeciesClassifier
-    clf = SpeciesClassifier(
-        model_path=os.getenv("MODEL_PATH", "best_model.pth"),
-        class_names_path=os.getenv("CLASS_NAMES_PATH", "class_names.json"),
-    )
-    predictions = clf.predict_bytes(image_bytes)
-    top = predictions[0] if predictions else {"species": "Unknown", "confidence": 0}
-
-    # ── Step 3: Generate Wildlife Report ────────────────────────────────
-    from backend.utils.report_generator import generate_report
-    report = generate_report(top["species"], top["confidence"], location)
-
-    # ── Step 4: Save sighting to Firestore via Node service ─────────────
-    sighting_data = {
-        "speciesName": top["species"],
-        "confidence":  top["confidence"],
-        "imageUrl":    image_url,
-        "location":    location,
-        "report":      report,
-        "allPredictions": predictions,
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(f"{NODE_SERVICE_URL}/api/sightings", json=sighting_data)
-    except Exception as e:
-        print(f"[Warning] Could not save to Firestore: {e}")
-
-    # ── Step 5: Return results ───────────────────────────────────────────
-    return {
-        "success":     True,
-        "topSpecies":  top["species"],
-        "confidence":  top["confidence"],
-        "imageUrl":    image_url,
-        "predictions": predictions,
-        "report":      report,
-        "location":    location,
-    }
+async def predict_legacy(file: UploadFile = File(...)) -> dict:
+    """Backward-compatible alias for clients still using /api/predict."""
+    return await predict(file)
 
 
-@app.get("/api/sightings")
-async def get_sightings():
-    """Proxy: fetch all sightings from Firestore via Node service."""
-    try:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(f"{NODE_SERVICE_URL}/api/sightings")
-            return response.json()
-    except Exception as e:
-        raise HTTPException(status_code=503, detail=f"Node service unavailable: {e}")
+app.include_router(api_router, prefix="/api", tags=["aux"])
 
 
-# ── Run ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+    uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)

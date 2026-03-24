@@ -32,6 +32,8 @@ parser.add_argument("--arch",       default="resnet50",  choices=["resnet50", "e
 parser.add_argument("--epochs",     type=int, default=20)
 parser.add_argument("--batch",      type=int, default=32)
 parser.add_argument("--lr",         type=float, default=0.001)
+parser.add_argument("--workers",    type=int, default=0, help="DataLoader workers. Use 0 for low-resource laptops.")
+parser.add_argument("--log-every",  type=int, default=20, help="Print batch progress every N training steps.")
 parser.add_argument("--train_dir",  default="data/train")
 parser.add_argument("--val_dir",    default="data/val")
 parser.add_argument("--output",     default="best_model.pth")
@@ -70,8 +72,8 @@ def main():
     # Load data
     train_ds = datasets.ImageFolder(args.train_dir, transform=train_tfm)
     val_ds   = datasets.ImageFolder(args.val_dir,   transform=val_tfm)
-    train_dl = DataLoader(train_ds, batch_size=args.batch, shuffle=True,  num_workers=2)
-    val_dl   = DataLoader(val_ds,   batch_size=args.batch, shuffle=False, num_workers=2)
+    train_dl = DataLoader(train_ds, batch_size=args.batch, shuffle=True,  num_workers=args.workers)
+    val_dl   = DataLoader(val_ds,   batch_size=args.batch, shuffle=False, num_workers=args.workers)
 
     class_names = train_ds.classes
     print(f"[Train] {len(class_names)} classes: {class_names}")
@@ -83,6 +85,7 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model  = model.to(device)
     print(f"[Train] Architecture: {args.arch} | Device: {device}")
+    print(f"[Train] DataLoader workers: {args.workers} | Batch size: {args.batch}")
 
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=args.lr)
@@ -94,7 +97,8 @@ def main():
         # Train
         model.train()
         loss_sum, correct = 0.0, 0
-        for imgs, labels in train_dl:
+        total_steps = len(train_dl)
+        for step, (imgs, labels) in enumerate(train_dl, start=1):
             imgs, labels = imgs.to(device), labels.to(device)
             optimizer.zero_grad()
             out  = model(imgs)
@@ -103,6 +107,13 @@ def main():
             optimizer.step()
             loss_sum += loss.item() * imgs.size(0)
             correct  += (out.argmax(1) == labels).sum().item()
+
+            if step % args.log_every == 0 or step == total_steps:
+                print(
+                    f"  Epoch {epoch:02d}/{args.epochs} | "
+                    f"Step {step:03d}/{total_steps:03d} | "
+                    f"Batch Loss: {loss.item():.4f}"
+                )
 
         # Validate
         model.eval()
