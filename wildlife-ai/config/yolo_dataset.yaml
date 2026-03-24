@@ -1,0 +1,21 @@
+# YOLOv8 dataset config for wildlife animal detection
+# Place detection images and labels as:
+# data/detection/images/train/*.jpg
+# data/detection/images/val/*.jpg
+# data/detection/labels/train/*.txt
+# data/detection/labels/val/*.txt
+
+path: data/detection
+train: images/train
+val: images/val
+
+# Update class names to match your selected animal subset
+names:
+  0: lion
+  1: tiger
+  2: elephant
+  3: zebra
+  4: giraffe
+  5: leopard
+  6: cheetah
+  7: rhinoceros

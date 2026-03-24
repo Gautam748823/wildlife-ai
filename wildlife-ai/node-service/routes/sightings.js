@@ -31,6 +31,10 @@ router.post("/", async (req, res) => {
       location,
       report,
       allPredictions,
+      predicted_species,
+      image_url,
+      all_predictions,
+      timestamp,
     } = req.body;
 
     if (!speciesName) {
@@ -38,13 +42,17 @@ router.post("/", async (req, res) => {
     }
 
     const docData = {
-      speciesName,
+      speciesName:       speciesName || predicted_species,
       confidence:       confidence || 0,
-      imageUrl:         imageUrl   || "",
+      imageUrl:         imageUrl || image_url || "",
       location:         location   || "Unknown",
       report:           report     || "",
-      allPredictions:   allPredictions || [],
+      allPredictions:   allPredictions || all_predictions || [],
+      predicted_species: speciesName || predicted_species || "Unknown",
+      image_url:         imageUrl || image_url || "",
+      all_predictions:   allPredictions || all_predictions || [],
       createdAt:        new Date().toISOString(),
+      timestamp_client: timestamp || null,
       timestamp:        require("firebase-admin").firestore.FieldValue.serverTimestamp(),
     };
 

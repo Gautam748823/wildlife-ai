@@ -10,6 +10,10 @@ Add new endpoint groups here as the project grows:
   - /api/dashboard  → aggregated stats
 """
 
+import json
+import os
+from pathlib import Path
+
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -18,10 +22,11 @@ router = APIRouter()
 @router.get("/species")
 def list_species():
     """Return list of all species the model can identify."""
-    import json, os
-    path = os.getenv("CLASS_NAMES_PATH", "class_names.json")
+    path = Path(os.getenv("CLASS_NAMES_PATH", "class_names.json"))
+    if not path.is_absolute():
+        path = Path(__file__).resolve().parents[2] / path
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             names = json.load(f)
         return {"species": names, "total": len(names)}
     except FileNotFoundError:

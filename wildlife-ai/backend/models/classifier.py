@@ -15,19 +15,9 @@ import io
 import json
 import torch
 import torch.nn as nn
-from torchvision import models, transforms
+from torchvision import models
 from PIL import Image
-
-
-# ImageNet normalisation values (used by all torchvision pre-trained models)
-PREPROCESS = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225],
-    ),
-])
+from backend.utils.preprocess import INFERENCE_TRANSFORM
 
 
 class SpeciesClassifier:
@@ -66,7 +56,7 @@ class SpeciesClassifier:
     def predict_bytes(self, image_bytes: bytes, top_k: int = 5) -> list[dict]:
         """Run inference on raw image bytes (from UploadFile.read())."""
         image  = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-        tensor = PREPROCESS(image).unsqueeze(0).to(self.device)
+        tensor = INFERENCE_TRANSFORM(image).unsqueeze(0).to(self.device)
 
         with torch.no_grad():
             probs = torch.softmax(self.model(tensor), dim=1)[0]
@@ -76,3 +66,7 @@ class SpeciesClassifier:
             {"species": self.class_names[i.item()], "confidence": round(p.item() * 100, 2)}
             for p, i in zip(top.values, top.indices)
         ]
+
+    def predict_top(self, image_bytes: bytes) -> dict:
+        predictions = self.predict_bytes(image_bytes, top_k=5)
+        return predictions[0] if predictions else {"species": "Unknown", "confidence": 0.0}
