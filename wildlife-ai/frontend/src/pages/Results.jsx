@@ -23,81 +23,95 @@ export default function Results() {
   // Guard: if no result data, redirect to upload page
   if (!result) {
     return (
-      <div style={s.page}>
-        <div style={s.card}>
+      <div className="page-shell">
+        <div className="glass-panel results-panel">
           <p>No results found. Please upload an image first.</p>
-          <button style={s.btnPrimary} onClick={() => navigate("/")}>← Go to Upload</button>
+          <button className="btn-primary" onClick={() => navigate("/")}>← Go to Upload</button>
         </div>
       </div>
     );
   }
 
-  const top         = result.predictions?.[0] || {};
-  const confidence  = top.confidence || 0;
-  const iucnColor   = getIucnColor(result.iucnStatus);
+  const predictions = result.predictions || [];
+  const top         = predictions[0] || {};
+  const topSpecies  = result.top_species || result.topSpecies || top.species || "Unknown";
+  const imageUrl    = result.image_url || result.imageUrl || "";
+  const confidence  = Number(result.confidence ?? top.confidence ?? 0);
+  const iucnStatus  = result.iucn_status || result.iucnStatus;
+  const iucnColor   = getIucnColor(iucnStatus);
+  const reportText  = result.report || "Report generation is optional and currently not enabled in the API response.";
 
   return (
-    <div style={s.page}>
-
-      {/* Header */}
-      <div style={s.hero}>
-        <h1 style={s.heroTitle}>Identification Results</h1>
-        <p style={s.heroSub}>AI analysis complete — {result.location || "Unknown location"}</p>
+    <div className="page-shell">
+      <div className="hero-banner">
+        <p className="hero-kicker">Prediction Complete</p>
+        <h1 className="hero-heading">Identification Results</h1>
+        <p className="hero-text">Confidence scores and alternative predictions from your live model.</p>
       </div>
 
-      <div style={s.card}>
-
-        {/* Image + top result row */}
-        <div style={s.topRow}>
-          {result.imageUrl && (
-            <img src={result.imageUrl} alt="Sighting" style={s.sightingImg} />
+      <div className="glass-panel results-panel">
+        <div className="result-top-row">
+          {imageUrl && (
+            <img src={imageUrl} alt="Sighting" className="result-image" />
           )}
-          <div style={s.topInfo}>
-            <div style={s.speciesLabel}>🐾 Identified Species</div>
-            <h2 style={s.speciesName}>{result.topSpecies || "Unknown"}</h2>
-            <p style={s.confText}>Confidence: {confidence}%</p>
-            {/* Confidence bar */}
-            <div style={s.barTrack}>
-              <div style={{ ...s.barFill, width: `${confidence}%` }} />
+          {!imageUrl && <div className="result-image-placeholder skeleton" />}
+          <div className="result-top-info">
+            <div className="result-label">🐾 Identified Species</div>
+            <h2 className="result-species-name">{topSpecies}</h2>
+            <p className="result-confidence">Confidence: {confidence}%</p>
+            <div className="confidence-track">
+              <div className="confidence-fill" style={{ width: `${confidence}%` }} />
             </div>
-            {result.iucnStatus && (
-              <span style={{ ...s.badge, background: iucnColor }}>
-                IUCN: {result.iucnStatus}
+            {iucnStatus && (
+              <span className="iucn-pill" style={{ background: iucnColor }}>
+                IUCN: {iucnStatus}
               </span>
             )}
           </div>
         </div>
 
-        <hr style={s.divider} />
+        <hr className="ui-divider" />
 
-        {/* All predictions */}
-        <h3 style={s.sectionTitle}>All Predictions</h3>
-        {(result.predictions || []).map((p, i) => (
-          <div key={i} style={s.predRow}>
-            <span style={s.predName}>{i + 1}. {p.species}</span>
-            <div style={s.predTrack}>
-              <div style={{ ...s.predFill, width: `${p.confidence}%` }} />
+        <h3 className="section-heading">All Predictions</h3>
+        <div className="predictions-list">
+          {predictions.length === 0 && (
+            <>
+              <div className="prediction-row skeleton-row-holder">
+                <span className="skeleton skeleton-inline-name" />
+                <span className="skeleton skeleton-inline-track" />
+                <span className="skeleton skeleton-inline-conf" />
+              </div>
+              <div className="prediction-row skeleton-row-holder">
+                <span className="skeleton skeleton-inline-name" />
+                <span className="skeleton skeleton-inline-track" />
+                <span className="skeleton skeleton-inline-conf" />
+              </div>
+            </>
+          )}
+          {predictions.map((p, i) => (
+            <div key={i} className="prediction-row">
+              <span className="prediction-name">{i + 1}. {p.species}</span>
+              <div className="prediction-track">
+                <div className="prediction-fill" style={{ width: `${p.confidence}%` }} />
+              </div>
+              <span className="prediction-conf">{p.confidence}%</span>
             </div>
-            <span style={s.predConf}>{p.confidence}%</span>
-          </div>
-        ))}
+          ))}
+        </div>
 
-        <hr style={s.divider} />
+        <hr className="ui-divider" />
 
-        {/* Wildlife report */}
-        <h3 style={s.sectionTitle}>🌿 Wildlife Conservation Report</h3>
-        <div style={s.reportBox}>{result.report || "Report not available."}</div>
+        <h3 className="section-heading">🌿 Wildlife Conservation Report</h3>
+        <div className="notice-info">{reportText}</div>
 
-        {/* Actions */}
-        <div style={s.actions}>
-          <button style={s.btnSecondary} onClick={() => navigate("/dashboard")}>
+        <div className="result-actions">
+          <button className="btn-secondary" onClick={() => navigate("/dashboard")}>
             📊 View Dashboard
           </button>
-          <button style={s.btnPrimary} onClick={() => navigate("/")}>
+          <button className="btn-primary" onClick={() => navigate("/")}>
             🔄 Identify Another
           </button>
         </div>
-
       </div>
     </div>
   );
@@ -108,32 +122,3 @@ function getIucnColor(status) {
   const map = { CR: "#c62828", EN: "#e65100", VU: "#f57f17", NT: "#1565c0", LC: "#2e7d32" };
   return map[status] || "#555";
 }
-
-// ── Styles ────────────────────────────────────────────────────────────────────
-const s = {
-  page:        { minHeight: "100vh", background: "#f0f4ec", fontFamily: "Segoe UI, sans-serif" },
-  hero:        { background: "linear-gradient(135deg,#2e7d32,#1b5e20)", color: "#fff", textAlign: "center", padding: "2.5rem 1rem 1.5rem" },
-  heroTitle:   { fontSize: "1.8rem", margin: 0 },
-  heroSub:     { opacity: 0.85, marginTop: "0.4rem" },
-  card:        { maxWidth: 720, margin: "2rem auto", background: "#fff", borderRadius: 16, padding: "2rem", boxShadow: "0 4px 20px rgba(0,0,0,0.08)" },
-  topRow:      { display: "flex", gap: "1.5rem", alignItems: "flex-start", flexWrap: "wrap" },
-  sightingImg: { width: 200, borderRadius: 12, border: "2px solid #c8e6c9", objectFit: "cover" },
-  topInfo:     { flex: 1 },
-  speciesLabel:{ fontSize: "0.85rem", color: "#888", marginBottom: "0.3rem" },
-  speciesName: { fontSize: "1.8rem", color: "#1b5e20", margin: "0 0 0.3rem" },
-  confText:    { color: "#555", margin: "0 0 0.6rem" },
-  barTrack:    { background: "#e8f5e9", borderRadius: 50, height: 10, marginBottom: "0.8rem" },
-  barFill:     { background: "linear-gradient(90deg,#4caf50,#2e7d32)", height: 10, borderRadius: 50, transition: "width 0.6s ease" },
-  badge:       { color: "#fff", padding: "0.25rem 0.75rem", borderRadius: 20, fontSize: "0.8rem", fontWeight: 600 },
-  divider:     { border: "none", borderTop: "1px solid #f0f0f0", margin: "1.5rem 0" },
-  sectionTitle:{ color: "#2e7d32", marginBottom: "0.8rem" },
-  predRow:     { display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "0.5rem", fontSize: "0.9rem" },
-  predName:    { width: 180, flexShrink: 0 },
-  predTrack:   { flex: 1, background: "#f5f5f5", borderRadius: 4, height: 6 },
-  predFill:    { background: "#a5d6a7", height: 6, borderRadius: 4 },
-  predConf:    { width: 50, textAlign: "right", color: "#555" },
-  reportBox:   { background: "#f9fbe7", borderLeft: "4px solid #4caf50", borderRadius: "0 8px 8px 0", padding: "1rem 1.2rem", fontSize: "0.92rem", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: "1.5rem" },
-  actions:     { display: "flex", gap: "1rem", flexWrap: "wrap" },
-  btnPrimary:  { flex: 1, padding: "0.8rem", background: "#2e7d32", color: "#fff", border: "none", borderRadius: 10, fontWeight: 600, cursor: "pointer" },
-  btnSecondary:{ flex: 1, padding: "0.8rem", background: "#e8f5e9", color: "#2e7d32", border: "1.5px solid #a5d6a7", borderRadius: 10, fontWeight: 600, cursor: "pointer" },
-};

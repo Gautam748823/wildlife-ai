@@ -8,9 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
-
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8000";
+import { getSightings } from "../utils/api";
 
 export function useSightings(limit = 50) {
   const [sightings, setSightings] = useState([]);
@@ -21,7 +19,7 @@ export function useSightings(limit = 50) {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await axios.get(`${API_BASE}/api/sightings?limit=${limit}`);
+      const data = await getSightings(limit);
       setSightings(data.sightings || []);
     } catch (err) {
       setError(err.response?.data?.detail || "Failed to load sightings from server.");

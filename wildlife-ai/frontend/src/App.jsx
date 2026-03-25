@@ -12,8 +12,8 @@
  *   npm install react-router-dom axios
  */
 
-import React from "react";
-import { BrowserRouter as Router, Routes, Route, NavLink } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { BrowserRouter as Router, Routes, Route, NavLink, useLocation } from "react-router-dom";
 
 import Upload    from "./pages/Upload";
 import Dashboard from "./pages/Dashboard";
@@ -22,77 +22,77 @@ import Results   from "./pages/Results";
 import "./styles/main.css";
 
 // ── Navbar ───────────────────────────────────────────────────────────────────
-function Navbar() {
+function Navbar({ theme, onToggleTheme }) {
   return (
-    <nav style={styles.navbar}>
-      <div style={styles.brand}>🦁 Wildlife AI</div>
-      <div style={styles.navLinks}>
+    <nav className="top-nav">
+      <div className="brand-pill">
+        <span className="brand-icon">🦁</span>
+        <div>
+          <div className="brand-title">Wildlife AI</div>
+          <div className="brand-subtitle">Conservation Intelligence</div>
+        </div>
+      </div>
+      <div className="top-nav-links">
         <NavLink
           to="/"
-          style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.activeLink : {}) })}
+          className={({ isActive }) => `top-nav-link${isActive ? " active" : ""}`}
         >
           Identify Species
         </NavLink>
         <NavLink
           to="/dashboard"
-          style={({ isActive }) => ({ ...styles.navLink, ...(isActive ? styles.activeLink : {}) })}
+          className={({ isActive }) => `top-nav-link${isActive ? " active" : ""}`}
         >
           Dashboard
         </NavLink>
+        <button
+          type="button"
+          className="theme-toggle"
+          onClick={onToggleTheme}
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? "☀️ Light" : "🌙 Dark"}
+        </button>
       </div>
     </nav>
   );
 }
 
-// ── App Root ─────────────────────────────────────────────────────────────────
-function App() {
+function AnimatedRoutes() {
+  const location = useLocation();
+
   return (
-    <Router>
-      <Navbar />
-      <Routes>
-        <Route path="/"          element={<Upload />} />
+    <div key={location.pathname} className="route-transition">
+      <Routes location={location}>
+        <Route path="/" element={<Upload />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/results"   element={<Results />} />
+        <Route path="/results" element={<Results />} />
       </Routes>
-    </Router>
+    </div>
   );
 }
 
-// ── Inline Styles ─────────────────────────────────────────────────────────────
-const styles = {
-  navbar: {
-    background:     "#1b5e20",
-    display:        "flex",
-    alignItems:     "center",
-    justifyContent: "space-between",
-    padding:        "0 2rem",
-    height:         "60px",
-    boxShadow:      "0 2px 8px rgba(0,0,0,0.3)",
-    position:       "sticky",
-    top:            0,
-    zIndex:         100,
-  },
-  brand: {
-    color:      "#fff",
-    fontSize:   "1.3rem",
-    fontWeight: 700,
-  },
-  navLinks: {
-    display: "flex",
-    gap:     "1.5rem",
-  },
-  navLink: {
-    color:          "#a5d6a7",
-    textDecoration: "none",
-    fontWeight:     500,
-    padding:        "0.4rem 0.8rem",
-    borderRadius:   "6px",
-    transition:     "background 0.2s",
-  },
-  activeLink: {
-    background: "rgba(255,255,255,0.15)",
-    color:      "#fff",
-  },
-};
+// ── App Root ─────────────────────────────────────────────────────────────────
+function App() {
+  const [theme, setTheme] = useState(() => localStorage.getItem("wildlife_theme") || "light");
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("wildlife_theme", theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
+  };
+
+  return (
+    <Router>
+      <div className="app-shell">
+        <Navbar theme={theme} onToggleTheme={toggleTheme} />
+        <AnimatedRoutes />
+      </div>
+    </Router>
+  );
+}
 
 export default App;
