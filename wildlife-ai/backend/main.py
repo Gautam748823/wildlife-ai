@@ -6,6 +6,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -116,10 +117,43 @@ async def predict(file: UploadFile = File(...)) -> dict:
     return response
 
 
+@app.post("/upload")
+async def upload_only(file: UploadFile = File(...)) -> dict:
+    """Upload image to Cloudinary and return secure URL without model inference."""
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Image file is required")
+
+    try:
+        validate_image_metadata(file.filename, file.content_type or "")
+        image_bytes = await file.read()
+        validate_image_bytes(image_bytes)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    try:
+        image_url = upload_image(image_bytes, file.filename)
+    except CloudinaryUploadError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+    return {"image_url": image_url}
+
+
 @app.post("/api/predict")
 async def predict_legacy(file: UploadFile = File(...)) -> dict:
     """Backward-compatible alias for clients still using /api/predict."""
     return await predict(file)
+
+
+@app.get("/api/sightings")
+async def list_sightings(limit: int = 50) -> dict:
+    """Proxy sightings list from Node Firestore service for frontend dashboard use."""
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(f"{NODE_SERVICE_URL}/api/sightings", params={"limit": limit})
+            response.raise_for_status()
+            return response.json()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail=f"Node service unavailable: {exc}") from exc
 
 
 app.include_router(api_router, prefix="/api", tags=["aux"])

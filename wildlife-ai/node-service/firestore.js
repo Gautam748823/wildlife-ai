@@ -20,15 +20,23 @@ const dotenv  = require("dotenv");
 const path    = require("path");
 const fs      = require("fs");
 
-dotenv.config();
+// Load environment from both project root and node-service for flexibility.
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 // ── Initialise Firebase Admin SDK ────────────────────────────────────────────
 if (!admin.apps.length) {
   const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 
-  if (serviceAccountPath && fs.existsSync(path.resolve(serviceAccountPath))) {
+  const resolvedServiceAccountPath = serviceAccountPath
+    ? (path.isAbsolute(serviceAccountPath)
+      ? serviceAccountPath
+      : path.resolve(__dirname, serviceAccountPath))
+    : "";
+
+  if (resolvedServiceAccountPath && fs.existsSync(resolvedServiceAccountPath)) {
     // Option A: use serviceAccountKey.json file
-    const serviceAccount = require(path.resolve(serviceAccountPath));
+    const serviceAccount = require(resolvedServiceAccountPath);
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
